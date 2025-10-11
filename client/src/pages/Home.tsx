@@ -1,68 +1,58 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import HikeCard from "@/components/HikeCard";
 import HikeFilters from "@/components/HikeFilters";
 import StatsCard from "@/components/StatsCard";
 import HikeDetailSheet from "@/components/HikeDetailSheet";
 import ShareDialog from "@/components/ShareDialog";
-import { TrendingUp, MapPin, Clock, Users } from "lucide-react";
+import { TrendingUp, MapPin } from "lucide-react";
+import { isUnauthorizedError } from "@/lib/authUtils";
+import { useToast } from "@/hooks/use-toast";
+
+interface HikeData {
+  id: string;
+  title: string;
+  location: string;
+  date: string;
+  duration: string;
+  distance: string;
+  difficulty: "easy" | "moderate" | "hard" | "expert";
+  notes?: string;
+  photos: Array<{ id: string; url: string }>;
+  collaborators: Array<{ id: string; name: string; avatar?: string }>;
+}
 
 export default function Home() {
   const [selectedHikeId, setSelectedHikeId] = useState<string | null>(null);
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const { toast } = useToast();
 
-  // todo: remove mock functionality
-  const mockHikes = [
-    {
-      id: "1",
-      title: "Eagle Peak Trail",
-      location: "Yosemite National Park, CA",
-      date: new Date('2024-10-05'),
-      duration: "3h 45m",
-      distance: "8.2 mi",
-      difficulty: "moderate" as const,
-      imageUrl: "https://images.unsplash.com/photo-1551632811-561732d1e306?w=800&q=80",
-      isShared: true,
-      notes: "Stunning views at the summit! Trail was well-maintained.",
-      photos: [
-        { id: "1", url: "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=400&q=80" },
-        { id: "2", url: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&q=80" },
-      ],
-      collaborators: [
-        { name: "Sarah K", avatar: "https://i.pravatar.cc/150?img=1" },
-        { name: "Mike R", avatar: "https://i.pravatar.cc/150?img=2" }
-      ]
+  const { data: hikes = [], isLoading, error } = useQuery<HikeData[]>({
+    queryKey: ["/api/hikes"],
+    retry: (failureCount, error) => {
+      if (error instanceof Error && isUnauthorizedError(error)) {
+        return false;
+      }
+      return failureCount < 3;
     },
-    {
-      id: "2",
-      title: "Misty Falls Loop",
-      location: "Olympic National Park, WA",
-      date: new Date('2024-09-28'),
-      duration: "2h 15m",
-      distance: "5.3 mi",
-      difficulty: "easy" as const,
-      imageUrl: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&q=80",
-      photos: [
-        { id: "3", url: "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=400&q=80" }
-      ],
-      collaborators: []
-    },
-    {
-      id: "3",
-      title: "Summit Ridge Challenge",
-      location: "Rocky Mountain National Park, CO",
-      date: new Date('2024-09-15'),
-      duration: "6h 30m",
-      distance: "12.8 mi",
-      difficulty: "expert" as const,
-      imageUrl: "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=800&q=80",
-      photos: [
-        { id: "4", url: "https://images.unsplash.com/photo-1501594907352-04cda38ebc29?w=400&q=80" }
-      ],
-      collaborators: []
-    }
-  ];
+  });
 
-  const selectedHike = mockHikes.find(h => h.id === selectedHikeId);
+  if (error instanceof Error && isUnauthorizedError(error)) {
+    toast({
+      title: "Authentication required",
+      description: "Please log in to view your hikes",
+      variant: "destructive",
+    });
+    window.location.href = "/api/login";
+    return null;
+  }
+
+  const selectedHike = hikes.find((h) => h.id === selectedHikeId);
+
+  const totalDistance = hikes.reduce((sum, hike) => {
+    const distance = parseFloat(hike.distance);
+    return sum + (isNaN(distance) ? 0 : distance);
+  }, 0);
 
   return (
     <div className="pb-20">
@@ -75,27 +65,59 @@ export default function Home() {
 
       <div className="container max-w-4xl mx-auto px-4 py-6 space-y-6">
         <div className="grid grid-cols-2 gap-3">
-          <StatsCard icon={TrendingUp} label="Total Hikes" value="24" />
-          <StatsCard icon={MapPin} label="Miles Hiked" value="186.5" />
+          <StatsCard icon={TrendingUp} label="Total Hikes" value={hikes.length.toString()} />
+          <StatsCard icon={MapPin} label="Miles Hiked" value={totalDistance.toFixed(1)} />
         </div>
 
         <HikeFilters onFilterChange={(filters) => console.log('Filters:', filters)} />
 
-        <div className="space-y-4">
-          {mockHikes.map((hike) => (
-            <HikeCard
-              key={hike.id}
-              {...hike}
-              onClick={() => setSelectedHikeId(hike.id)}
-            />
-          ))}
-        </div>
+        {isLoading ? (
+          <div className="space-y-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-40 bg-muted animate-pulse rounded-lg" />
+            ))}
+          </div>
+        ) : hikes.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-muted-foreground">No hikes yet. Start logging your adventures!</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {hikes.map((hike) => (
+              <HikeCard
+                key={hike.id}
+                id={hike.id}
+                title={hike.title}
+                location={hike.location}
+                date={new Date(hike.date)}
+                duration={hike.duration}
+                distance={hike.distance}
+                difficulty={hike.difficulty}
+                imageUrl={hike.photos[0]?.url}
+                isShared={hike.collaborators.length > 0}
+                collaborators={hike.collaborators}
+                onClick={() => setSelectedHikeId(hike.id)}
+              />
+            ))}
+          </div>
+        )}
       </div>
 
       <HikeDetailSheet
         open={!!selectedHikeId}
         onOpenChange={(open) => !open && setSelectedHikeId(null)}
-        hike={selectedHike}
+        hike={selectedHike ? {
+          id: selectedHike.id,
+          title: selectedHike.title,
+          location: selectedHike.location,
+          date: new Date(selectedHike.date),
+          duration: selectedHike.duration,
+          distance: selectedHike.distance,
+          difficulty: selectedHike.difficulty,
+          notes: selectedHike.notes,
+          photos: selectedHike.photos,
+          collaborators: selectedHike.collaborators
+        } : undefined}
         onShare={() => {
           setShareDialogOpen(true);
           setSelectedHikeId(null);
@@ -103,19 +125,20 @@ export default function Home() {
         onEdit={() => console.log('Edit hike')}
       />
 
-      <ShareDialog
-        open={shareDialogOpen}
-        onOpenChange={setShareDialogOpen}
-        hikeName={selectedHike?.title}
-        existingCollaborators={selectedHike?.collaborators?.map((c, i) => ({
-          id: String(i),
-          name: c.name,
-          email: `${c.name.toLowerCase().replace(/\s/g, '')}@example.com`,
-          avatar: c.avatar
-        })) || []}
-        onShare={(email) => console.log('Share with:', email)}
-        onRemove={(id) => console.log('Remove:', id)}
-      />
+      {selectedHike && (
+        <ShareDialog
+          open={shareDialogOpen}
+          onOpenChange={setShareDialogOpen}
+          hikeId={selectedHike.id}
+          hikeName={selectedHike.title}
+          existingCollaborators={selectedHike.collaborators?.map((c) => ({
+            id: c.id,
+            name: c.name,
+            email: `${c.name.toLowerCase().replace(/\s/g, '')}@example.com`,
+            avatar: c.avatar
+          })) || []}
+        />
+      )}
     </div>
   );
 }

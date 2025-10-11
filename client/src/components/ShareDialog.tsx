@@ -1,10 +1,14 @@
 import { useState } from "react";
+import { useMutation } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { UserPlus, X, Mail } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { isUnauthorizedError } from "@/lib/authUtils";
 
 interface Collaborator {
   id: string;
@@ -16,28 +20,88 @@ interface Collaborator {
 interface ShareDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  hikeId: string;
   hikeName?: string;
   existingCollaborators?: Collaborator[];
-  onShare?: (email: string) => void;
-  onRemove?: (id: string) => void;
 }
 
 export default function ShareDialog({ 
   open, 
   onOpenChange, 
+  hikeId,
   hikeName = "this hike",
-  existingCollaborators = [],
-  onShare,
-  onRemove
+  existingCollaborators = []
 }: ShareDialogProps) {
   const [email, setEmail] = useState("");
+  const { toast } = useToast();
+
+  const addCollaboratorMutation = useMutation({
+    mutationFn: async (email: string) => {
+      const response = await apiRequest("POST", `/api/hikes/${hikeId}/collaborators`, { email });
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Collaborator added",
+        description: "The hike has been shared successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/hikes"] });
+      setEmail("");
+    },
+    onError: (error: Error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You must be logged in to share hikes",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Failed to share",
+          description: error.message,
+          variant: "destructive",
+        });
+      }
+    },
+  });
+
+  const removeCollaboratorMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const response = await apiRequest("DELETE", `/api/hikes/${hikeId}/collaborators/${userId}`);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Collaborator removed",
+        description: "Access has been revoked successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/hikes"] });
+    },
+    onError: (error: Error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You must be logged in to remove collaborators",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Failed to remove",
+          description: error.message,
+          variant: "destructive",
+        });
+      }
+    },
+  });
 
   const handleShare = () => {
     if (email) {
-      console.log('Sharing with:', email);
-      onShare?.(email);
-      setEmail("");
+      addCollaboratorMutation.mutate(email);
     }
+  };
+
+  const handleRemove = (userId: string) => {
+    removeCollaboratorMutation.mutate(userId);
   };
 
   return (
@@ -65,10 +129,15 @@ export default function ShareDialog({
                 placeholder="user@example.com"
                 data-testid="input-share-email"
                 onKeyDown={(e) => e.key === 'Enter' && handleShare()}
+                disabled={addCollaboratorMutation.isPending}
               />
-              <Button onClick={handleShare} data-testid="button-send-invite">
+              <Button 
+                onClick={handleShare} 
+                data-testid="button-send-invite"
+                disabled={addCollaboratorMutation.isPending}
+              >
                 <UserPlus className="w-4 h-4 mr-2" />
-                Invite
+                {addCollaboratorMutation.isPending ? "Inviting..." : "Invite"}
               </Button>
             </div>
           </div>
@@ -96,11 +165,9 @@ export default function ShareDialog({
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() => {
-                        console.log('Removing collaborator:', collab.id);
-                        onRemove?.(collab.id);
-                      }}
+                      onClick={() => handleRemove(collab.id)}
                       data-testid={`button-remove-${collab.id}`}
+                      disabled={removeCollaboratorMutation.isPending}
                     >
                       <X className="w-4 h-4" />
                     </Button>

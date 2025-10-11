@@ -1,61 +1,56 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import MapView from "@/components/MapView";
 import HikeDetailSheet from "@/components/HikeDetailSheet";
+import { isUnauthorizedError } from "@/lib/authUtils";
+import { useToast } from "@/hooks/use-toast";
+
+interface HikeData {
+  id: string;
+  title: string;
+  location: string;
+  date: string;
+  duration: string;
+  distance: string;
+  difficulty: "easy" | "moderate" | "hard" | "expert";
+  notes?: string;
+  photos: Array<{ id: string; url: string }>;
+  collaborators: Array<{ id: string; name: string; avatar?: string }>;
+}
 
 export default function MapPage() {
   const [selectedHikeId, setSelectedHikeId] = useState<string | null>(null);
+  const { toast } = useToast();
 
-  // todo: remove mock functionality
-  const mockHikes = [
-    {
-      id: "1",
-      title: "Eagle Peak Trail",
-      location: "Yosemite National Park, CA",
-      lat: 37.7,
-      lng: -119.5,
-      difficulty: "moderate" as const,
-      date: new Date('2024-10-05'),
-      duration: "3h 45m",
-      distance: "8.2 mi",
-      notes: "Stunning views at the summit!",
-      photos: [
-        { id: "1", url: "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=400&q=80" }
-      ],
-      collaborators: []
+  const { data: hikes = [], isLoading, error } = useQuery<HikeData[]>({
+    queryKey: ["/api/hikes"],
+    retry: (failureCount, error) => {
+      if (error instanceof Error && isUnauthorizedError(error)) {
+        return false;
+      }
+      return failureCount < 3;
     },
-    {
-      id: "2",
-      title: "Misty Falls Loop",
-      location: "Olympic National Park, WA",
-      lat: 37.8,
-      lng: -119.6,
-      difficulty: "easy" as const,
-      date: new Date('2024-09-28'),
-      duration: "2h 15m",
-      distance: "5.3 mi",
-      photos: [
-        { id: "2", url: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&q=80" }
-      ],
-      collaborators: []
-    },
-    {
-      id: "3",
-      title: "Summit Ridge",
-      location: "Rocky Mountain National Park, CO",
-      lat: 37.9,
-      lng: -119.7,
-      difficulty: "expert" as const,
-      date: new Date('2024-09-15'),
-      duration: "6h 30m",
-      distance: "12.8 mi",
-      photos: [
-        { id: "3", url: "https://images.unsplash.com/photo-1501594907352-04cda38ebc29?w=400&q=80" }
-      ],
-      collaborators: []
-    }
-  ];
+  });
 
-  const selectedHike = mockHikes.find(h => h.id === selectedHikeId);
+  if (error instanceof Error && isUnauthorizedError(error)) {
+    toast({
+      title: "Authentication required",
+      description: "Please log in to view the map",
+      variant: "destructive",
+    });
+    window.location.href = "/api/login";
+    return null;
+  }
+
+  const mapHikes = hikes.map((hike, index) => ({
+    id: hike.id,
+    title: hike.title,
+    lat: 37.7 + (index * 0.1),
+    lng: -119.5 + (index * 0.1),
+    difficulty: hike.difficulty,
+  }));
+
+  const selectedHike = hikes.find((h) => h.id === selectedHikeId);
 
   return (
     <div className="pb-20">
@@ -67,16 +62,31 @@ export default function MapPage() {
       </div>
 
       <div className="h-[calc(100vh-180px)] p-4">
-        <MapView
-          hikes={mockHikes.map(h => ({ id: h.id, title: h.title, lat: h.lat, lng: h.lng, difficulty: h.difficulty }))}
-          onHikeClick={setSelectedHikeId}
-        />
+        {isLoading ? (
+          <div className="h-full bg-muted animate-pulse rounded-lg" />
+        ) : (
+          <MapView
+            hikes={mapHikes}
+            onHikeClick={setSelectedHikeId}
+          />
+        )}
       </div>
 
       <HikeDetailSheet
         open={!!selectedHikeId}
         onOpenChange={(open) => !open && setSelectedHikeId(null)}
-        hike={selectedHike}
+        hike={selectedHike ? {
+          id: selectedHike.id,
+          title: selectedHike.title,
+          location: selectedHike.location,
+          date: new Date(selectedHike.date),
+          duration: selectedHike.duration,
+          distance: selectedHike.distance,
+          difficulty: selectedHike.difficulty,
+          notes: selectedHike.notes,
+          photos: selectedHike.photos,
+          collaborators: selectedHike.collaborators
+        } : undefined}
         onShare={() => console.log('Share clicked')}
         onEdit={() => console.log('Edit clicked')}
       />

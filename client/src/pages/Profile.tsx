@@ -3,16 +3,30 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import StatsCard from "@/components/StatsCard";
 import ThemeToggle from "@/components/ThemeToggle";
-import { TrendingUp, MapPin, Clock, Users, Settings, LogOut } from "lucide-react";
+import { TrendingUp, MapPin, Clock, Users, LogOut } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { useQuery } from "@tanstack/react-query";
+import { format } from "date-fns";
+
+interface Stats {
+  totalHikes: number;
+  totalDistance: string;
+  totalHours: number;
+  sharedTrails: number;
+}
 
 export default function Profile() {
-  // todo: remove mock functionality
-  const mockUser = {
-    name: "Alex Johnson",
-    email: "alex.johnson@example.com",
-    avatar: "https://i.pravatar.cc/150?img=5",
-    memberSince: "January 2024"
-  };
+  const { user } = useAuth();
+  const { data: stats } = useQuery<Stats>({
+    queryKey: ['/api/stats'],
+  });
+
+  const userName = user?.firstName && user?.lastName 
+    ? `${user.firstName} ${user.lastName}`
+    : user?.firstName || user?.email || 'User';
+  
+  const userInitial = userName.charAt(0).toUpperCase();
+  const memberSince = user?.createdAt ? format(new Date(user.createdAt), 'MMMM yyyy') : 'Recently';
 
   return (
     <div className="pb-20">
@@ -29,13 +43,13 @@ export default function Profile() {
         <Card className="p-6">
           <div className="flex items-center gap-4">
             <Avatar className="w-20 h-20" data-testid="avatar-user">
-              <AvatarImage src={mockUser.avatar} />
-              <AvatarFallback className="text-2xl">{mockUser.name.charAt(0)}</AvatarFallback>
+              <AvatarImage src={user?.profileImageUrl || undefined} className="object-cover" />
+              <AvatarFallback className="text-2xl">{userInitial}</AvatarFallback>
             </Avatar>
             <div className="flex-1">
-              <h2 className="text-2xl font-outfit font-semibold" data-testid="text-user-name">{mockUser.name}</h2>
-              <p className="text-muted-foreground" data-testid="text-user-email">{mockUser.email}</p>
-              <p className="text-sm text-muted-foreground mt-1">Member since {mockUser.memberSince}</p>
+              <h2 className="text-2xl font-outfit font-semibold" data-testid="text-user-name">{userName}</h2>
+              <p className="text-muted-foreground" data-testid="text-user-email">{user?.email}</p>
+              <p className="text-sm text-muted-foreground mt-1">Member since {memberSince}</p>
             </div>
           </div>
         </Card>
@@ -43,27 +57,18 @@ export default function Profile() {
         <div className="space-y-3">
           <h3 className="font-semibold text-lg">Your Stats</h3>
           <div className="grid grid-cols-2 gap-3">
-            <StatsCard icon={TrendingUp} label="Total Hikes" value="24" />
-            <StatsCard icon={MapPin} label="Miles Hiked" value="186.5" />
-            <StatsCard icon={Clock} label="Hours Spent" value="82" />
-            <StatsCard icon={Users} label="Shared Trails" value="12" />
+            <StatsCard icon={TrendingUp} label="Total Hikes" value={stats?.totalHikes || 0} />
+            <StatsCard icon={MapPin} label="Miles Hiked" value={stats?.totalDistance || 0} />
+            <StatsCard icon={Clock} label="Hours Spent" value={stats?.totalHours || 0} />
+            <StatsCard icon={Users} label="Shared Trails" value={stats?.sharedTrails || 0} />
           </div>
         </div>
 
         <div className="space-y-2">
           <Button 
             variant="outline" 
-            className="w-full justify-start gap-3"
-            onClick={() => console.log('Settings clicked')}
-            data-testid="button-settings"
-          >
-            <Settings className="w-5 h-5" />
-            Settings
-          </Button>
-          <Button 
-            variant="outline" 
             className="w-full justify-start gap-3 text-destructive hover:text-destructive"
-            onClick={() => console.log('Logout clicked')}
+            onClick={() => window.location.href = '/api/logout'}
             data-testid="button-logout"
           >
             <LogOut className="w-5 h-5" />

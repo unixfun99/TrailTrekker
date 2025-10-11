@@ -1,8 +1,52 @@
+import { useMutation } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import HikeForm from "@/components/HikeForm";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import { isUnauthorizedError } from "@/lib/authUtils";
 
 export default function AddHike() {
+  const [, setLocation] = useLocation();
+  const { toast } = useToast();
+
+  const createHikeMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const response = await apiRequest("POST", "/api/hikes", data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/hikes"] });
+      setLocation("/");
+    },
+    onError: (error: Error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Authentication required",
+          description: "Please log in to add hikes",
+          variant: "destructive",
+        });
+        window.location.href = "/api/login";
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to save hike. Please try again.",
+          variant: "destructive",
+        });
+      }
+    },
+  });
+
+  const handleFormSubmit = async (data: any) => {
+    try {
+      const hike = await createHikeMutation.mutateAsync(data);
+      return hike;
+    } catch (error) {
+      throw error;
+    }
+  };
+
   return (
     <div className="pb-20">
       <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
@@ -11,10 +55,7 @@ export default function AddHike() {
             <Button 
               variant="ghost" 
               size="icon"
-              onClick={() => {
-                console.log('Navigate back');
-                window.location.hash = '/';
-              }}
+              onClick={() => setLocation("/")}
               data-testid="button-back"
             >
               <ArrowLeft className="w-5 h-5" />
@@ -26,10 +67,7 @@ export default function AddHike() {
       </div>
 
       <div className="container max-w-2xl mx-auto px-4 py-6">
-        <HikeForm onSubmit={(data) => {
-          console.log('Hike saved:', data);
-          window.location.hash = '/';
-        }} />
+        <HikeForm onSubmit={handleFormSubmit} />
       </div>
     </div>
   );
