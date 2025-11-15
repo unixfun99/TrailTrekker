@@ -1,8 +1,7 @@
-// Integration: blueprint:javascript_log_in_with_replit
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { setupAuth, isAuthenticated } from "./replitAuth";
+import { setupAuth, isAuthenticated } from "./googleAuth";
 import { insertHikeSchema, users } from "@shared/schema";
 import multer from "multer";
 import path from "path";
@@ -43,12 +42,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   app.use('/uploads', (await import('express')).static('uploads'));
 
-  // Auth routes (from blueprint)
+  // Auth routes
   app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      res.json(user);
+      // With Passport.js, user is directly in req.user
+      res.json(req.user);
     } catch (error) {
       console.error("Error fetching user:", error);
       res.status(500).json({ message: "Failed to fetch user" });
@@ -58,7 +56,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Hike routes
   app.get("/api/hikes", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const hikes = await storage.getUserHikes(userId);
       
       // Get photos and collaborators for each hike
@@ -87,7 +85,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/hikes/shared", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const hikes = await storage.getSharedHikes(userId);
       
       const hikesWithDetails = await Promise.all(
@@ -115,7 +113,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/hikes/:id", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const hike = await storage.getHike(req.params.id);
       
       if (!hike) {
@@ -150,7 +148,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/hikes", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const result = insertHikeSchema.safeParse(req.body);
       
       if (!result.success) {
@@ -167,7 +165,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/hikes/:id", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const hike = await storage.updateHike(req.params.id, userId, req.body);
       
       if (!hike) {
@@ -183,7 +181,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/hikes/:id", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const deleted = await storage.deleteHike(req.params.id, userId);
       
       if (!deleted) {
@@ -200,7 +198,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Photo routes
   app.post("/api/hikes/:hikeId/photos", isAuthenticated, upload.single('photo'), async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const hike = await storage.getHike(req.params.hikeId);
       
       if (!hike) {
@@ -233,7 +231,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Collaborator routes
   app.post("/api/hikes/:hikeId/collaborators", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const hike = await storage.getHike(req.params.hikeId);
       
       if (!hike) {
@@ -270,7 +268,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/hikes/:hikeId/collaborators/:userId", isAuthenticated, async (req: any, res) => {
     try {
-      const currentUserId = req.user.claims.sub;
+      const currentUserId = req.user.id;
       const hike = await storage.getHike(req.params.hikeId);
       
       if (!hike) {
@@ -297,7 +295,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // User stats
   app.get("/api/stats", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const hikes = await storage.getUserHikes(userId);
       const sharedHikes = await storage.getSharedHikes(userId);
       

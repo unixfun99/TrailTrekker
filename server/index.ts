@@ -1,10 +1,51 @@
 import express, { type Request, Response, NextFunction } from "express";
+import session from "express-session";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+
+// Note: express-mysql-session requires CommonJS-style require for TypeScript
+const MySQLStore = require("express-mysql-session")(session);
 
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+
+// Parse DATABASE_URL
+const dbUrl = new URL(process.env.DATABASE_URL || "mysql://root@localhost:3306/trailshare");
+
+// Configure MySQL session store
+const sessionStore = new MySQLStore({
+  host: dbUrl.hostname,
+  port: parseInt(dbUrl.port || "3306"),
+  user: dbUrl.username,
+  password: dbUrl.password,
+  database: dbUrl.pathname.substring(1), // Remove leading slash
+  createDatabaseTable: true,
+  schema: {
+    tableName: "sessions",
+    columnNames: {
+      session_id: "sid",
+      expires: "expire",
+      data: "sess",
+    },
+  },
+});
+
+// Session middleware
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET || "your-secret-key-change-this-in-production",
+    store: sessionStore,
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production", // HTTPS only in production
+      sameSite: "lax",
+    },
+  })
+);
 
 app.use((req, res, next) => {
   const start = Date.now();
