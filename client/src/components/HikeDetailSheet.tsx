@@ -1,10 +1,21 @@
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { MapPin, Calendar, Clock, TrendingUp, Share2, Edit } from "lucide-react";
+import { MapPin, Calendar, Clock, TrendingUp, Share2, Edit, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import PhotoGallery from "./PhotoGallery";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { useState } from "react";
 
 interface HikeDetailSheetProps {
   open: boolean;
@@ -23,6 +34,7 @@ interface HikeDetailSheetProps {
   };
   onShare?: () => void;
   onEdit?: () => void;
+  onDelete?: () => void;
 }
 
 const difficultyConfig = {
@@ -32,10 +44,24 @@ const difficultyConfig = {
   expert: { bg: "bg-red-500/20 dark:bg-red-500/20", text: "text-red-700 dark:text-red-400", label: "Expert" }
 };
 
-export default function HikeDetailSheet({ open, onOpenChange, hike, onShare, onEdit }: HikeDetailSheetProps) {
+export default function HikeDetailSheet({ open, onOpenChange, hike, onShare, onEdit, onDelete }: HikeDetailSheetProps) {
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
   if (!hike) return null;
 
   const diffStyle = difficultyConfig[hike.difficulty];
+
+  const handleDelete = async () => {
+    setIsDeleting(true);
+    try {
+      await onDelete?.();
+      // Only close dialog on success (parent will handle)
+    } catch (error) {
+      setIsDeleting(false);
+      // Keep dialog open on error
+    }
+  };
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -45,14 +71,23 @@ export default function HikeDetailSheet({ open, onOpenChange, hike, onShare, onE
         </SheetHeader>
 
         <div className="space-y-6 mt-6">
-          <div className="flex gap-2">
-            <Button onClick={onEdit} variant="outline" className="flex-1" data-testid="button-edit-hike">
+          <div className="grid grid-cols-2 gap-2">
+            <Button onClick={onEdit} variant="outline" data-testid="button-edit-hike">
               <Edit className="w-4 h-4 mr-2" />
               Edit
             </Button>
-            <Button onClick={onShare} className="flex-1" data-testid="button-share-hike">
+            <Button onClick={onShare} data-testid="button-share-hike">
               <Share2 className="w-4 h-4 mr-2" />
               Share
+            </Button>
+            <Button 
+              onClick={() => setDeleteDialogOpen(true)} 
+              variant="destructive" 
+              className="col-span-2"
+              data-testid="button-delete-hike"
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Delete Hike
             </Button>
           </div>
 
@@ -113,6 +148,28 @@ export default function HikeDetailSheet({ open, onOpenChange, hike, onShare, onE
           )}
         </div>
       </SheetContent>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent data-testid="dialog-delete-confirm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this hike?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete "{hike.title}" and all associated photos.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting} data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDelete}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-confirm-delete"
+            >
+              {isDeleting ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Sheet>
   );
 }

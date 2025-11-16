@@ -67,6 +67,16 @@ TrailShare is a mobile-optimized web application for tracking and sharing hiking
 - Stats: `/api/stats` (GET)
 
 ## Recent Changes
+- 2025-11-16: **✨ Bug Fixes and Feature Enhancements**
+  - Fixed Edit Hike functionality with new EditHikeDialog component
+  - Fixed Share Hike dialog timing - now opens immediately
+  - Fixed image preview cache with delayed query invalidation
+  - Implemented complete search/filter functionality (keyword, difficulty, sorting)
+  - Integrated Leaflet interactive map with color-coded markers
+  - Added Delete Hike functionality with confirmation dialog
+  - Added latitude/longitude fields to schema for map support
+  - **⚠️ Schema Change**: Run `npm run db:push` on server to add new coordinate fields
+  
 - 2025-11-16: **🚀 MySQL-Only Refactoring for Rocky Linux Deployment**
   - **BREAKING**: Removed PostgreSQL support - Application is now MySQL-only
   - Simplified codebase by removing all dual-database conditionals

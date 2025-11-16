@@ -16,10 +16,6 @@ export default function AddHike() {
       const response = await apiRequest("POST", "/api/hikes", data);
       return response.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/hikes"] });
-      setLocation("/");
-    },
     onError: (error: Error) => {
       if (isUnauthorizedError(error)) {
         toast({
@@ -41,6 +37,16 @@ export default function AddHike() {
   const handleFormSubmit = async (data: any) => {
     try {
       const hike = await createHikeMutation.mutateAsync(data);
+      
+      // Invalidate queries after hike is created (and photos uploaded in HikeForm)
+      // Delay slightly to ensure photo uploads complete
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ["/api/hikes"] });
+      }, 500);
+      
+      // Navigate back to home
+      setLocation("/");
+      
       return hike;
     } catch (error) {
       throw error;

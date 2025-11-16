@@ -42,6 +42,8 @@ export const hikes = mysqlTable("hikes", {
   userId: varchar("user_id", { length: 255 }).notNull().references(() => users.id, { onDelete: 'cascade' }),
   title: text("title").notNull(),
   location: text("location").notNull(),
+  latitude: text("latitude"),  // Optional: coordinates for map display
+  longitude: text("longitude"), // Optional: coordinates for map display
   date: timestamp("date").notNull(),
   duration: text("duration").notNull(),
   distance: text("distance").notNull(),
