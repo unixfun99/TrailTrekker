@@ -37,6 +37,7 @@ app.use(
     }),
     resave: false,
     saveUninitialized: false,
+    proxy: process.env.NODE_ENV === "production", // CRITICAL: Trust proxy for secure cookies
     cookie: {
       maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
       httpOnly: true,
