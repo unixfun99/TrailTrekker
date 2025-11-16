@@ -17,6 +17,10 @@ import { db } from "./db";
 import { eq, and, or, desc } from "drizzle-orm";
 import { randomUUID } from "crypto";
 
+// Detect database type once at module level
+const isPostgres = process.env.DATABASE_URL?.startsWith('postgres://') || 
+                   process.env.DATABASE_URL?.startsWith('postgresql://');
+
 export interface IStorage {
   // User operations (required for Replit Auth)
   getUser(id: string): Promise<User | undefined>;
@@ -50,30 +54,59 @@ export class DatabaseStorage implements IStorage {
   }
 
   async upsertUser(userData: UpsertUser): Promise<User> {
-    const [user] = await db
-      .insert(users)
-      .values(userData)
-      .onConflictDoUpdate({
-        target: users.id,
-        set: {
-          ...userData,
-          updatedAt: new Date(),
-        },
-      })
-      .returning();
-    return user;
+    if (isPostgres) {
+      // PostgreSQL: Use onConflictDoUpdate with returning
+      const [user] = await db
+        .insert(users)
+        .values(userData)
+        .onConflictDoUpdate({
+          target: users.id,
+          set: {
+            ...userData,
+            updatedAt: new Date(),
+          },
+        })
+        .returning();
+      return user;
+    } else {
+      // MySQL: Use onDuplicateKeyUpdate, then SELECT
+      await db
+        .insert(users)
+        .values(userData)
+        .onDuplicateKeyUpdate({
+          set: {
+            email: userData.email,
+            firstName: userData.firstName,
+            lastName: userData.lastName,
+            profileImageUrl: userData.profileImageUrl,
+            updatedAt: new Date(),
+          },
+        });
+      
+      // Fetch the user after insert/update
+      const [user] = await db.select().from(users).where(eq(users.id, userData.id));
+      return user!;
+    }
   }
 
   // Hike operations
   async createHike(hikeData: InsertHike & { userId: string }): Promise<Hike> {
-    const [hike] = await db
-      .insert(hikes)
-      .values({
-        ...hikeData,
-        date: new Date(hikeData.date),
-      })
-      .returning();
-    return hike;
+    const hikeId = randomUUID();
+    const insertData = {
+      id: hikeId,
+      ...hikeData,
+      date: new Date(hikeData.date),
+    };
+    
+    if (isPostgres) {
+      const [hike] = await db.insert(hikes).values(insertData).returning();
+      return hike;
+    } else {
+      // MySQL: Insert then SELECT
+      await db.insert(hikes).values(insertData);
+      const [hike] = await db.select().from(hikes).where(eq(hikes.id, hikeId));
+      return hike!;
+    }
   }
 
   async getHike(id: string): Promise<Hike | undefined> {
@@ -116,28 +149,51 @@ export class DatabaseStorage implements IStorage {
     }
     updateData.updatedAt = new Date();
 
-    const [updated] = await db
-      .update(hikes)
-      .set(updateData)
-      .where(eq(hikes.id, id))
-      .returning();
-    
-    return updated;
+    if (isPostgres) {
+      const [updated] = await db
+        .update(hikes)
+        .set(updateData)
+        .where(eq(hikes.id, id))
+        .returning();
+      return updated;
+    } else {
+      // MySQL: Update then SELECT
+      await db.update(hikes).set(updateData).where(eq(hikes.id, id));
+      const [updated] = await db.select().from(hikes).where(eq(hikes.id, id));
+      return updated;
+    }
   }
 
   async deleteHike(id: string, userId: string): Promise<boolean> {
-    const result = await db
-      .delete(hikes)
-      .where(and(eq(hikes.id, id), eq(hikes.userId, userId)))
-      .returning();
-    
-    return result.length > 0;
+    if (isPostgres) {
+      const result = await db
+        .delete(hikes)
+        .where(and(eq(hikes.id, id), eq(hikes.userId, userId)))
+        .returning();
+      return result.length > 0;
+    } else {
+      // MySQL: Check existence first, then delete
+      const existing = await this.getHike(id);
+      if (!existing || existing.userId !== userId) return false;
+      await db.delete(hikes).where(eq(hikes.id, id));
+      return true;
+    }
   }
 
   // Photo operations
   async addPhoto(photoData: InsertPhoto): Promise<Photo> {
-    const [photo] = await db.insert(photos).values(photoData).returning();
-    return photo;
+    const photoId = randomUUID();
+    const insertData = { id: photoId, ...photoData };
+    
+    if (isPostgres) {
+      const [photo] = await db.insert(photos).values(insertData).returning();
+      return photo;
+    } else {
+      // MySQL: Insert then SELECT
+      await db.insert(photos).values(insertData);
+      const [photo] = await db.select().from(photos).where(eq(photos.id, photoId));
+      return photo!;
+    }
   }
 
   async getHikePhotos(hikeId: string): Promise<Photo[]> {
@@ -145,17 +201,32 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deletePhoto(id: string): Promise<boolean> {
-    const result = await db.delete(photos).where(eq(photos.id, id)).returning();
-    return result.length > 0;
+    if (isPostgres) {
+      const result = await db.delete(photos).where(eq(photos.id, id)).returning();
+      return result.length > 0;
+    } else {
+      // MySQL: Check existence first, then delete
+      const [existing] = await db.select().from(photos).where(eq(photos.id, id));
+      if (!existing) return false;
+      await db.delete(photos).where(eq(photos.id, id));
+      return true;
+    }
   }
 
   // Collaborator operations
   async addCollaborator(collaboratorData: InsertCollaborator): Promise<Collaborator> {
-    const [collaborator] = await db
-      .insert(collaborators)
-      .values(collaboratorData)
-      .returning();
-    return collaborator;
+    const collabId = randomUUID();
+    const insertData = { id: collabId, ...collaboratorData };
+    
+    if (isPostgres) {
+      const [collaborator] = await db.insert(collaborators).values(insertData).returning();
+      return collaborator;
+    } else {
+      // MySQL: Insert then SELECT
+      await db.insert(collaborators).values(insertData);
+      const [collaborator] = await db.select().from(collaborators).where(eq(collaborators.id, collabId));
+      return collaborator!;
+    }
   }
 
   async getHikeCollaborators(hikeId: string): Promise<Array<Collaborator & { user: User }>> {
@@ -172,12 +243,19 @@ export class DatabaseStorage implements IStorage {
   }
 
   async removeCollaborator(hikeId: string, userId: string): Promise<boolean> {
-    const result = await db
-      .delete(collaborators)
-      .where(and(eq(collaborators.hikeId, hikeId), eq(collaborators.userId, userId)))
-      .returning();
-    
-    return result.length > 0;
+    if (isPostgres) {
+      const result = await db
+        .delete(collaborators)
+        .where(and(eq(collaborators.hikeId, hikeId), eq(collaborators.userId, userId)))
+        .returning();
+      return result.length > 0;
+    } else {
+      // MySQL: Check existence first, then delete
+      const existing = await this.isCollaborator(hikeId, userId);
+      if (!existing) return false;
+      await db.delete(collaborators).where(and(eq(collaborators.hikeId, hikeId), eq(collaborators.userId, userId)));
+      return true;
+    }
   }
 
   async isCollaborator(hikeId: string, userId: string): Promise<boolean> {
