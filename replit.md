@@ -2,12 +2,12 @@
 
 ## ⚠️ IMPORTANT: Deployment Configuration
 
-**This application is configured for self-hosted deployment on Rocky Linux with MariaDB/MySQL and Google OAuth.**
+**This application requires MySQL/MariaDB and is configured for self-hosted deployment on Rocky Linux.**
 
-- **Production Target**: Rocky Linux server with MariaDB
-- **Authentication**: Google OAuth (Passport.js)
-- **Database**: MySQL/MariaDB configured schema
-- **Testing on Replit**: Currently uses Replit Auth for testing only
+- **Production Target**: Rocky Linux server with MariaDB/MySQL
+- **Authentication**: Google OAuth (Passport.js) for production, Replit Auth for development
+- **Database**: MySQL/MariaDB ONLY - PostgreSQL is not supported
+- **⚠️ Cannot run on Replit**: This app requires MySQL and will not work with Replit's PostgreSQL database
 
 ### For Rocky Linux Deployment
 See **DEPLOYMENT_ROCKY_LINUX.md** for complete deployment instructions including:
@@ -32,8 +32,8 @@ TrailShare is a mobile-optimized web application for tracking and sharing hiking
 ## Tech Stack
 - **Frontend**: React, TypeScript, Tailwind CSS, Shadcn UI
 - **Backend**: Express.js, Node.js
-- **Database**: MySQL/MariaDB with Drizzle ORM (PostgreSQL on Replit for testing)
-- **Authentication**: Google OAuth2 via Passport.js (Replit Auth for testing)
+- **Database**: MySQL/MariaDB with Drizzle ORM (MySQL ONLY)
+- **Authentication**: Google OAuth2 via Passport.js (Replit Auth for development)
 - **Sessions**: MemoryStore (express-mysql-session for production)
 - **File Upload**: Multer for image handling
 
@@ -51,11 +51,11 @@ TrailShare is a mobile-optimized web application for tracking and sharing hiking
   - `src/hooks/`: Custom React hooks including useAuth
 - `server/`: Backend Express application
   - `routes.ts`: API endpoints
-  - `storage.ts`: Database operations
-  - `replitAuth.ts`: Replit Auth for testing (temporary)
+  - `storage.ts`: Database operations (MySQL-only)
+  - `replitAuth.ts`: Replit Auth for development
   - `googleAuth.ts`: Google OAuth for production
-  - `db.ts`: Database connection (supports both PostgreSQL and MySQL)
-- `shared/`: Shared TypeScript types and schemas (MySQL format)
+  - `db.ts`: MySQL database connection (MySQL ONLY)
+- `shared/`: Shared TypeScript types and schemas (MySQL-only)
 - `uploads/`: Photo storage directory
 
 ## API Endpoints
@@ -67,13 +67,22 @@ TrailShare is a mobile-optimized web application for tracking and sharing hiking
 - Stats: `/api/stats` (GET)
 
 ## Recent Changes
-- 2025-11-16: **🚀 Migrated for Rocky Linux deployment**
+- 2025-11-16: **🚀 MySQL-Only Refactoring for Rocky Linux Deployment**
+  - **BREAKING**: Removed PostgreSQL support - Application is now MySQL-only
+  - Simplified codebase by removing all dual-database conditionals
+  - Eliminated 34 TypeScript errors caused by union database types
+  - All Drizzle ORM operations now use MySQL-specific syntax
+  - Schema uses `mysqlTable` exclusively (no `pgTable`)
+  - Fixed `server/db.ts` to validate MySQL connection strings only
+  - Updated `server/storage.ts` to remove all `isPostgres` conditionals
+  - Application will NOT run on Replit's built-in PostgreSQL database
+  
+- 2025-11-16: **🚀 Initial Rocky Linux Migration**
   - Converted database schema from PostgreSQL to MySQL/MariaDB
   - Replaced Replit Auth with Google OAuth2 (Passport.js)
   - Changed user ID strategy: Google ID as primary key (no UUIDs)
   - Updated session storage to use MemoryStore (express-mysql-session for production)
   - Created comprehensive deployment guide for Rocky Linux
-  - Added dual-database support in db.ts (PostgreSQL for Replit testing, MySQL for production)
   
 - 2025-10-11: **✅ Initial full-stack implementation**
   - Built complete application with Replit Auth and PostgreSQL
@@ -83,10 +92,12 @@ TrailShare is a mobile-optimized web application for tracking and sharing hiking
   - Comprehensive error handling
 
 ## Deployment Notes
-- **Replit Testing**: Uses PostgreSQL and Replit Auth (current environment)
-- **Production**: Requires MySQL/MariaDB and Google OAuth credentials
-- **Migration Path**: Download code from Replit → Deploy to Rocky Linux
-- **No Data Migration**: Start fresh on production (separate databases)
+- **⚠️ MySQL Required**: This application requires MySQL/MariaDB database
+- **Cannot Run on Replit**: Replit's built-in PostgreSQL database is not supported
+- **Development Setup**: Requires local MySQL instance or external MySQL database
+- **Production Deployment**: Rocky Linux server with MariaDB and Google OAuth
+- **Migration Path**: Deploy code to Rocky Linux with MySQL/MariaDB configured
+- **Database Setup**: Use `npm run db:push` to sync schema to MySQL database
 
 ## User Preferences
 - Mobile-first responsive design

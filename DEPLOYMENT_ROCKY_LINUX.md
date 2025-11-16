@@ -219,7 +219,31 @@ GOOGLE_CALLBACK_URL=https://your-domain.com/api/auth/google/callback
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
-### Step 4: Create Database Tables
+### Step 4: Fix Drizzle Configuration (CRITICAL)
+
+**⚠️ REQUIRED BEFORE DATABASE SETUP**: The `drizzle.config.ts` file needs to be manually updated for MySQL.
+
+```bash
+# Edit drizzle.config.ts
+nano drizzle.config.ts
+```
+
+**Change line 10** from `dialect: "postgresql",` to `dialect: "mysql",`:
+
+```typescript
+export default defineConfig({
+  out: "./migrations",
+  schema: "./shared/schema.ts",
+  dialect: "mysql",  // ← Change this line from "postgresql" to "mysql"
+  dbCredentials: {
+    url: process.env.DATABASE_URL,
+  },
+});
+```
+
+Save and exit (Ctrl+X, then Y, then Enter).
+
+### Step 5: Create Database Tables
 
 **IMPORTANT**: This application has been migrated from PostgreSQL to MySQL/MariaDB. If you're deploying from Replit code, you're starting fresh with a new database.
 
@@ -238,7 +262,7 @@ This will create all necessary tables:
 - `collaborators` - Shared hike permissions
 - `sessions` - Session storage (auto-created by express-mysql-session)
 
-### Step 5: Build Frontend
+### Step 6: Build Frontend
 
 ```bash
 # Build the React frontend
