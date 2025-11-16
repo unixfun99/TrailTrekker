@@ -1,41 +1,23 @@
 import express, { type Request, Response, NextFunction } from "express";
 import session from "express-session";
+import createMemoryStore from "memorystore";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
-
-// Note: express-mysql-session requires CommonJS-style require for TypeScript
-const MySQLStore = require("express-mysql-session")(session);
 
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// Parse DATABASE_URL
-const dbUrl = new URL(process.env.DATABASE_URL || "mysql://root@localhost:3306/trailshare");
-
-// Configure MySQL session store
-const sessionStore = new MySQLStore({
-  host: dbUrl.hostname,
-  port: parseInt(dbUrl.port || "3306"),
-  user: dbUrl.username,
-  password: dbUrl.password,
-  database: dbUrl.pathname.substring(1), // Remove leading slash
-  createDatabaseTable: true,
-  schema: {
-    tableName: "sessions",
-    columnNames: {
-      session_id: "sid",
-      expires: "expire",
-      data: "sess",
-    },
-  },
-});
+// Use MemoryStore for Replit (for MySQL deployment, see DEPLOYMENT_ROCKY_LINUX.md)
+const MemoryStore = createMemoryStore(session);
 
 // Session middleware
 app.use(
   session({
     secret: process.env.SESSION_SECRET || "your-secret-key-change-this-in-production",
-    store: sessionStore,
+    store: new MemoryStore({
+      checkPeriod: 86400000, // prune expired entries every 24h
+    }),
     resave: false,
     saveUninitialized: false,
     cookie: {
