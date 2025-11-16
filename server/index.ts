@@ -1,5 +1,13 @@
 import dotenv from "dotenv";
-dotenv.config();
+import { fileURLToPath } from "url";
+import { dirname, join } from "path";
+
+// Get the directory of the current file
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// Load .env from project root (handles both dev and production)
+dotenv.config({ path: join(__dirname, "..", ".env") });
 
 import express, { type Request, Response, NextFunction } from "express";
 import session from "express-session";
