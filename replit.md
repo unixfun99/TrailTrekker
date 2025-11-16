@@ -1,10 +1,27 @@
 # TrailShare - Collaborative Hiking Tracker
 
+## ⚠️ IMPORTANT: Deployment Configuration
+
+**This application is configured for self-hosted deployment on Rocky Linux with MariaDB/MySQL and Google OAuth.**
+
+- **Production Target**: Rocky Linux server with MariaDB
+- **Authentication**: Google OAuth (Passport.js)
+- **Database**: MySQL/MariaDB configured schema
+- **Testing on Replit**: Currently uses Replit Auth for testing only
+
+### For Rocky Linux Deployment
+See **DEPLOYMENT_ROCKY_LINUX.md** for complete deployment instructions including:
+- MariaDB setup and configuration
+- Google OAuth credentials from Google Cloud Console
+- Environment variables configuration
+- PM2 process management
+- Nginx reverse proxy setup
+
 ## Overview
 TrailShare is a mobile-optimized web application for tracking and sharing hiking adventures. Users can log hikes with locations, photos, difficulty ratings, and collaborate with others on shared trails.
 
 ## Features
-- **User Authentication**: Replit Auth integration supporting Google, GitHub, X, Apple, and email/password login
+- **User Authentication**: Google OAuth for production deployment (Replit Auth for testing)
 - **Hike Logging**: Record trail name, location, date, duration, distance, difficulty, and personal notes
 - **Photo Management**: Upload and store multiple photos per hike with gallery view
 - **Collaborative Sharing**: Share hikes with other users via email for multi-user editing
@@ -15,16 +32,17 @@ TrailShare is a mobile-optimized web application for tracking and sharing hiking
 ## Tech Stack
 - **Frontend**: React, TypeScript, Tailwind CSS, Shadcn UI
 - **Backend**: Express.js, Node.js
-- **Database**: PostgreSQL (Neon) with Drizzle ORM
-- **Authentication**: Replit Auth (OpenID Connect)
+- **Database**: MySQL/MariaDB with Drizzle ORM (PostgreSQL on Replit for testing)
+- **Authentication**: Google OAuth2 via Passport.js (Replit Auth for testing)
+- **Sessions**: MemoryStore (express-mysql-session for production)
 - **File Upload**: Multer for image handling
 
-## Database Schema
-- **users**: User profiles from Replit Auth
+## Database Schema (MySQL)
+- **users**: User profiles (id is Google ID - no auto-generation)
 - **hikes**: Hike records with details
 - **photos**: Image URLs linked to hikes
 - **collaborators**: Many-to-many relationship for hike sharing
-- **sessions**: Session management for auth
+- **sessions**: Session storage (auto-created by express-mysql-session)
 
 ## Project Structure
 - `client/`: Frontend React application
@@ -34,8 +52,10 @@ TrailShare is a mobile-optimized web application for tracking and sharing hiking
 - `server/`: Backend Express application
   - `routes.ts`: API endpoints
   - `storage.ts`: Database operations
-  - `replitAuth.ts`: Authentication setup
-- `shared/`: Shared TypeScript types and schemas
+  - `replitAuth.ts`: Replit Auth for testing (temporary)
+  - `googleAuth.ts`: Google OAuth for production
+  - `db.ts`: Database connection (supports both PostgreSQL and MySQL)
+- `shared/`: Shared TypeScript types and schemas (MySQL format)
 - `uploads/`: Photo storage directory
 
 ## API Endpoints
@@ -47,15 +67,26 @@ TrailShare is a mobile-optimized web application for tracking and sharing hiking
 - Stats: `/api/stats` (GET)
 
 ## Recent Changes
-- 2025-10-11: **✅ Completed full-stack implementation**
-  - Integrated Replit Auth (OpenID Connect) with PostgreSQL session storage
-  - Built complete database schema with users, hikes, photos, and collaborators tables
-  - Implemented all backend API endpoints with authentication middleware
-  - Connected all frontend pages to backend APIs (removed all mock data)
-  - Added photo upload with Multer (multipart/form-data handling)
-  - Implemented collaborative sharing system (users can share hikes via email)
-  - Added comprehensive error handling with 401 redirects and toast notifications
-  - **Tested end-to-end** - All features verified working correctly
+- 2025-11-16: **🚀 Migrated for Rocky Linux deployment**
+  - Converted database schema from PostgreSQL to MySQL/MariaDB
+  - Replaced Replit Auth with Google OAuth2 (Passport.js)
+  - Changed user ID strategy: Google ID as primary key (no UUIDs)
+  - Updated session storage to use MemoryStore (express-mysql-session for production)
+  - Created comprehensive deployment guide for Rocky Linux
+  - Added dual-database support in db.ts (PostgreSQL for Replit testing, MySQL for production)
+  
+- 2025-10-11: **✅ Initial full-stack implementation**
+  - Built complete application with Replit Auth and PostgreSQL
+  - All CRUD operations for hikes, photos, and collaborators
+  - Photo upload with Multer
+  - Collaborative sharing system
+  - Comprehensive error handling
+
+## Deployment Notes
+- **Replit Testing**: Uses PostgreSQL and Replit Auth (current environment)
+- **Production**: Requires MySQL/MariaDB and Google OAuth credentials
+- **Migration Path**: Download code from Replit → Deploy to Rocky Linux
+- **No Data Migration**: Start fresh on production (separate databases)
 
 ## User Preferences
 - Mobile-first responsive design
